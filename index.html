@@ -1,0 +1,2340 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>택배 일괄폼 생성기</title>
+
+  <meta name="description" content="쇼핑몰 주문 엑셀을 업로드하면 수령인, 전화번호, 주소 기준으로 주문을 묶어 택배 일괄폼 엑셀을 생성하는 무료 웹 도구입니다. 파일은 서버에 저장되지 않고 브라우저에서 처리됩니다." />
+  <meta name="robots" content="index,follow" />
+  <meta name="author" content="WOONIVERSE" />
+  <meta name="theme-color" content="#111827" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="택배 일괄폼 생성기" />
+  <meta property="og:description" content="주문 엑셀을 분석해 상품명, 옵션, 수량을 정리하고 같은 수령 정보는 하나의 택배 일괄폼으로 묶어 다운로드합니다." />
+  <meta property="og:locale" content="ko_KR" />
+  <link rel="canonical" href="https://wooniverse.cloud/tools/parcel-batch-form.html" />
+
+  <!--
+    광고 설정 위치
+    1) Google AdSense:
+       - adsenseClient: ca-pub-숫자 형태의 게시자 ID
+       - adsenseSlots: 광고 단위별 data-ad-slot 숫자
+    2) Kakao AdFit:
+       - adfitUnits: AdFit 광고 단위 ID, 보통 DAN- 으로 시작
+    3) 실제 심사 전에는 아래 값을 반드시 실제 값으로 교체하세요.
+       placeholder 상태에서는 광고 요청을 보내지 않습니다.
+  -->
+  <script>
+    window.WOONIVERSE_AD_CONFIG = {
+      adsenseClient: "ca-pub-0000000000000000",
+      adsenseSlots: {
+        top: "0000000000",
+        bottom: "0000000000"
+      },
+      adfitUnits: {
+        middle: { unit: "DAN-0000000000000000", width: 320, height: 100 },
+        footer: { unit: "DAN-0000000000000000", width: 320, height: 100 }
+      }
+    };
+  </script>
+
+  <!--
+    택배 일괄폼 생성기
+    - 서버/PHP/DB 없음
+    - 브라우저에서 엑셀 업로드 → 분석 → 택배 일괄폼 xlsx 다운로드
+    - 엑셀 읽기/쓰기용 SheetJS CDN 사용
+  -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #f5f6f8;
+      --card: #ffffff;
+      --text: #15171a;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --accent: #111827;
+      --accent2: #2563eb;
+      --danger: #dc2626;
+      --ok: #16a34a;
+      --warn: #f59e0b;
+      --soft: #f3f4f6;
+      --radius: 18px;
+      --shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", Arial, sans-serif;
+      line-height: 1.5;
+    }
+
+    .wrap {
+      max-width: 1320px;
+      margin: 0 auto;
+    }
+
+    .top {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 18px;
+      align-items: stretch;
+      margin-bottom: 18px;
+    }
+
+    .hero,
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 28px;
+    }
+
+    .hero h1 {
+      margin: 0 0 10px;
+      font-size: clamp(24px, 3vw, 38px);
+      letter-spacing: -0.05em;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .notice {
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .notice strong {
+      font-size: 15px;
+    }
+
+    .notice ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .card {
+      padding: 20px;
+      margin-bottom: 18px;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .section-title h2 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: -0.03em;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .upload-box {
+      border: 2px dashed #cbd5e1;
+      background: #f8fafc;
+      border-radius: 18px;
+      padding: 26px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .upload-box.dragover {
+      border-color: var(--accent2);
+      background: #eff6ff;
+    }
+
+    .upload-text strong {
+      display: block;
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+
+    .upload-text span {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button,
+    .file-label {
+      appearance: none;
+      border: 0;
+      border-radius: 12px;
+      background: var(--accent);
+      color: #fff;
+      padding: 12px 16px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.08s ease, opacity 0.15s ease, background 0.15s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      white-space: nowrap;
+    }
+
+    button:hover,
+    .file-label:hover {
+      opacity: 0.92;
+    }
+
+    button:active,
+    .file-label:active {
+      transform: translateY(1px);
+    }
+
+    button.secondary {
+      background: #e5e7eb;
+      color: #111827;
+    }
+
+    button.blue {
+      background: var(--accent2);
+    }
+
+    button.green {
+      background: var(--ok);
+    }
+
+    button.danger {
+      background: var(--danger);
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .grid.cols-4 {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .grid.cols-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .stat {
+      border: 1px solid var(--line);
+      background: #fafafa;
+      border-radius: 15px;
+      padding: 16px;
+    }
+
+    .stat b {
+      display: block;
+      font-size: 24px;
+      letter-spacing: -0.04em;
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .mapping-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .header-custom-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .header-custom-grid input {
+      font-weight: 700;
+    }
+
+    .save-state-pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: #f0fdf4;
+      color: #166534;
+      font-size: 12px;
+      font-weight: 800;
+      border: 1px solid #bbf7d0;
+    }
+
+    .preview-header-input {
+      width: 100%;
+      min-width: 100px;
+      min-height: 34px;
+      border: 1px solid #cbd5e1;
+      border-radius: 9px;
+      background: #ffffff;
+      padding: 7px 9px;
+      font-size: 13px;
+      font-weight: 900;
+      color: #111827;
+    }
+
+    .preview-header-input:focus {
+      outline: 2px solid rgba(37, 99, 235, 0.25);
+      border-color: var(--accent2);
+    }
+
+    .preview-header-cell {
+      min-width: 170px;
+    }
+
+    .preview-header-editor {
+      display: grid;
+      grid-template-columns: minmax(120px, 1fr) 34px;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .preview-header-source {
+      grid-column: 1 / -1;
+      width: 100%;
+      min-height: 32px;
+      border: 1px solid #d1d5db;
+      border-radius: 9px;
+      background: #ffffff;
+      padding: 5px 8px;
+      font-size: 12px;
+      font-weight: 800;
+      color: #374151;
+    }
+
+    .preview-header-delete {
+      min-height: 34px;
+      width: 34px;
+      padding: 0;
+      border-radius: 9px;
+      background: #fee2e2;
+      color: #991b1b;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .preview-header-delete:disabled {
+      background: #e5e7eb;
+      color: #9ca3af;
+      opacity: 0.8;
+      cursor: not-allowed;
+    }
+
+    label.field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 13px;
+      color: #374151;
+      font-weight: 700;
+    }
+
+    select,
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      min-height: 42px;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      padding: 9px 11px;
+      font: inherit;
+      background: #fff;
+      color: #111827;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      max-height: 520px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 900px;
+      font-size: 13px;
+    }
+
+    .product-table {
+      min-width: 520px;
+    }
+
+    .shipment-table {
+      min-width: 1050px;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid var(--line);
+      padding: 10px 11px;
+      text-align: left;
+      vertical-align: top;
+      white-space: nowrap;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #f9fafb;
+      font-weight: 800;
+      color: #374151;
+    }
+
+    tr:hover td {
+      background: #f8fafc;
+    }
+
+    td.long {
+      white-space: normal;
+      min-width: 280px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #3730a3;
+      padding: 3px 9px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .warn-box {
+      background: #fffbeb;
+      color: #92400e;
+      border: 1px solid #fde68a;
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 13px;
+      margin-top: 12px;
+    }
+
+    .error-box {
+      background: #fef2f2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 13px;
+      margin-top: 12px;
+    }
+
+    .ok-box {
+      background: #f0fdf4;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 13px;
+      margin-top: 12px;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .footer-actions {
+      position: sticky;
+      bottom: 16px;
+      z-index: 5;
+      margin-top: 18px;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      box-shadow: var(--shadow);
+    }
+
+    .filename-box {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .filename-input-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 8px 0 4px;
+    }
+
+    .filename-input-row input {
+      width: min(360px, 100%);
+      min-height: 38px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+
+    .site-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: -4px 0 18px;
+      align-items: center;
+    }
+
+    .site-nav a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #ffffff;
+      color: #111827;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .site-nav a:hover {
+      background: #f9fafb;
+    }
+
+    .site-nav a.tools-more-link {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: var(--accent);
+    }
+
+    .site-nav a.tools-more-link:hover {
+      background: #1f2937;
+    }
+
+    .ad-section {
+      margin: 18px 0;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: #ffffff;
+      box-shadow: var(--shadow);
+    }
+
+    .ad-label {
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+    }
+
+    .ad-stack {
+      display: grid;
+      gap: 12px;
+      justify-items: center;
+    }
+
+    .ad-slot {
+      width: 100%;
+      min-height: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px dashed #cbd5e1;
+      border-radius: 12px;
+      background: #f8fafc;
+      color: #64748b;
+      font-size: 13px;
+      text-align: center;
+      overflow: hidden;
+    }
+
+    .ad-slot[data-network="adsense"] {
+      min-height: 90px;
+    }
+
+    .content-section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 24px;
+      margin-bottom: 18px;
+    }
+
+    .content-section h2 {
+      margin: 0 0 12px;
+      font-size: 20px;
+      letter-spacing: -0.03em;
+    }
+
+    .content-section h3 {
+      margin: 18px 0 8px;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .content-section p {
+      margin: 0 0 10px;
+      color: #374151;
+      font-size: 14px;
+    }
+
+    .content-section ul,
+    .content-section ol {
+      margin: 8px 0 0;
+      padding-left: 20px;
+      color: #374151;
+      font-size: 14px;
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .info-tile {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fafafa;
+      padding: 16px;
+    }
+
+    .info-tile strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 15px;
+    }
+
+    .info-tile span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .policy-box {
+      border: 1px solid #dbeafe;
+      background: #eff6ff;
+      border-radius: 14px;
+      padding: 14px;
+      color: #1e3a8a;
+      font-size: 14px;
+    }
+
+    .site-footer {
+      margin: 22px 0 8px;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: #ffffff;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    @media (max-width: 980px) {
+      body {
+        padding: 14px;
+      }
+
+      .top {
+        grid-template-columns: 1fr;
+      }
+
+      .upload-box {
+        grid-template-columns: 1fr;
+      }
+
+      .mapping-grid,
+      .header-custom-grid,
+      .grid.cols-4,
+      .grid.cols-3 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .footer-actions {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .footer-actions .btn-row,
+      .footer-actions button {
+        width: 100%;
+      }
+
+      .filename-input-row {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .filename-input-row input {
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .mapping-grid,
+      .header-custom-grid,
+      .grid.cols-4,
+      .grid.cols-3 {
+        grid-template-columns: 1fr;
+      }
+
+      table {
+        min-width: 760px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="top">
+      <section class="hero">
+        <h1>택배 일괄폼 생성기</h1>
+        <p>
+          쇼핑몰 주문 엑셀을 업로드하면 상품명/옵션/수량을 정리하고,
+          같은 <b>받는사람 + 전화번호 + 주소</b> 기준으로 묶어 택배 일괄폼을 생성합니다. 옵션/사이즈는 반드시 상품명1에 합쳐집니다.
+        </p>
+      </section>
+
+      <aside class="notice card">
+        <strong>생성되는 일괄폼 헤더</strong>
+        <ul>
+          <li>기본값: 받는사람 / 전화번호1 / 우편번호 / 주소 / 수량(A타입) / 상품명1 / 배송메시지</li>
+          <li>택배 일괄폼 미리보기 표의 헤더 칸에서 바로 수정/추가/삭제할 수 있고, 각 헤더마다 표시할 정보를 선택할 수 있습니다.</li>
+          <li>헤더명과 표시 정보 설정은 현재 기기에 자동 저장됩니다.</li>
+          <li>수량(A타입)은 묶음 1건당 <b>1</b>로 고정됩니다.</li>
+          <li>옵션/사이즈는 배송메시지가 아니라 <b>상품명1</b>에 붙습니다.</li>
+          <li>같은 이름이어도 전화번호 또는 주소가 다르면 별도 택배로 분리됩니다.</li>
+        </ul>
+      </aside>
+    </div>
+
+    <nav class="site-nav" aria-label="페이지 이동">
+      <a href="#tool">엑셀 업로드</a>
+      <a href="#guide">사용 방법</a>
+      <a href="#privacy">개인정보 처리</a>
+      <a href="#faq">자주 묻는 질문</a>
+      <a href="#contact">문의</a>
+      <a class="tools-more-link" href="https://wooniverse.cloud/tools" target="_blank" rel="noopener">WOONIVERSE TOOLS 더보기</a>
+    </nav>
+
+    <section class="ad-section" aria-label="광고 영역">
+      <div class="ad-label">광고</div>
+      <div class="ad-stack">
+        <div class="ad-slot" data-network="adsense" data-position="top">Google AdSense 광고 영역</div>
+      </div>
+    </section>
+
+    <section id="tool" class="card">
+      <div class="section-title">
+        <h2>1. 엑셀 업로드</h2>
+        <span class="small">xlsx, xls, csv 가능</span>
+      </div>
+
+      <div id="dropZone" class="upload-box">
+        <div class="upload-text">
+          <strong>파일을 선택하거나 여기에 드래그하세요</strong>
+          <span>첫 번째 시트를 기준으로 분석합니다. 헤더 행은 자동 감지합니다.</span>
+        </div>
+        <div class="btn-row">
+          <label for="excelFile" class="file-label">엑셀 선택</label>
+          <input id="excelFile" type="file" accept=".xlsx,.xls,.csv" />
+          <button id="resetBtn" type="button" class="secondary">초기화</button>
+        </div>
+      </div>
+
+      <div id="fileInfo" class="ok-box hidden"></div>
+      <div id="errorBox" class="error-box hidden"></div>
+    </section>
+
+    <section id="mappingCard" class="card hidden">
+      <div class="section-title">
+        <h2>2. 컬럼 자동 매핑 확인</h2>
+        <span class="small">자동 인식이 틀리면 직접 바꾸세요. 옵션은 상품명에 붙고, 배송메시지는 요청사항/메모 계열만 사용합니다.</span>
+      </div>
+
+      <div class="mapping-grid">
+        <label class="field">
+          받는사람 *
+          <select id="mapReceiver"></select>
+        </label>
+
+        <label class="field">
+          전화번호1 *
+          <select id="mapPhone"></select>
+        </label>
+
+        <label class="field">
+          우편번호
+          <select id="mapZip"></select>
+        </label>
+
+        <label class="field">
+          주소 *
+          <select id="mapAddress"></select>
+        </label>
+
+        <label class="field">
+          상품명 *
+          <select id="mapProduct"></select>
+        </label>
+
+        <label class="field">
+          옵션/사이즈
+          <select id="mapOption"></select>
+        </label>
+
+        <label class="field">
+          수량
+          <select id="mapQty"></select>
+        </label>
+
+        <label class="field">
+          배송메시지
+          <select id="mapMsg"></select>
+        </label>
+      </div>
+
+      <div class="btn-row" style="margin-top: 14px;">
+        <button id="applyMapBtn" type="button" class="blue">매핑 적용 / 다시 분석</button>
+      </div>
+
+      <div id="mappingWarn" class="warn-box hidden"></div>
+    </section>
+<section class="ad-section" aria-label="광고 영역">
+      <div class="ad-label">광고</div>
+      <div class="ad-stack">
+        <div class="ad-slot" data-network="adfit" data-position="middle">Kakao AdFit 광고 영역</div>
+      </div>
+    </section>
+
+    <section id="statsCard" class="card hidden">
+      <div class="section-title">
+        <h2>3. 분석 결과</h2>
+        <span class="small">동일 수령인/전화번호/주소는 하나의 택배로 묶음</span>
+      </div>
+
+      <div class="grid cols-4">
+        <div class="stat">
+          <b id="statRawRows">0</b>
+          <span>원본 주문 행</span>
+        </div>
+        <div class="stat">
+          <b id="statShipments">0</b>
+          <span>생성 택배 건수</span>
+        </div>
+        <div class="stat">
+          <b id="statItems">0</b>
+          <span>총 상품 수량</span>
+        </div>
+        <div class="stat">
+          <b id="statProducts">0</b>
+          <span>상품/옵션 종류</span>
+        </div>
+      </div>
+    </section>
+
+    <div id="previewArea" class="split hidden">
+      <section class="card">
+        <div class="section-title">
+          <h2>상품 요약</h2>
+          <span id="productPreviewCount" class="small"></span>
+        </div>
+        <div class="table-wrap product-table-wrap">
+          <table class="product-table">
+            <thead>
+              <tr>
+                <th style="width: 70px;">번호</th>
+                <th>상품명/옵션</th>
+                <th style="width: 110px;">수량</th>
+              </tr>
+            </thead>
+            <tbody id="productSummaryBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="section-title">
+          <div>
+            <h2>택배 일괄폼 미리보기</h2>
+            <div class="small">아래 표의 헤더 칸을 직접 수정할 수 있고, 각 헤더마다 표시할 정보도 선택할 수 있습니다.</div>
+          </div>
+          <div class="btn-row">
+            <button id="addHeaderBtn" type="button" class="blue">헤더 추가</button>
+            <button id="resetHeaderBtn" type="button" class="secondary">헤더 기본값 복구</button>
+            <button id="clearSavedHeaderBtn" type="button" class="secondary">기기 저장값 삭제</button>
+            <span id="headerSaveState" class="save-state-pill">기기에 자동 저장됨</span>
+          </div>
+        </div>
+        <div class="section-title" style="margin-top: -4px;">
+          <span></span>
+          <span id="shipmentPreviewCount" class="small"></span>
+        </div>
+        <div class="table-wrap shipment-table-wrap">
+          <table class="shipment-table">
+            <thead id="shipmentHead"></thead>
+            <tbody id="shipmentBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <section id="guide" class="content-section">
+      <h2>택배 일괄폼 생성기 사용 방법</h2>
+      <p>
+        이 페이지는 온라인 주문 엑셀을 업로드한 뒤 수령인 정보가 같은 주문을 하나의 택배 건으로 묶어 주는 웹 도구입니다.
+        상품명, 옵션, 수량을 조합해 택배사 일괄 접수용 엑셀 파일을 만들 수 있습니다.
+      </p>
+      <div class="content-grid">
+        <div class="info-tile">
+          <strong>1. 주문 엑셀 업로드</strong>
+          <span>xlsx, xls, csv 파일을 선택하면 첫 번째 시트의 헤더와 주문 데이터를 브라우저에서 읽습니다.</span>
+        </div>
+        <div class="info-tile">
+          <strong>2. 컬럼 자동 매핑 확인</strong>
+          <span>받는사람, 전화번호, 주소, 상품명, 옵션, 수량, 배송메시지 컬럼을 자동으로 찾고 직접 수정할 수 있습니다.</span>
+        </div>
+        <div class="info-tile">
+          <strong>3. 일괄폼 다운로드</strong>
+          <span>미리보기에서 헤더와 표시 정보를 확인한 뒤 현재 날짜가 포함된 엑셀 파일로 저장합니다.</span>
+        </div>
+      </div>
+
+      <h3>묶음 처리 기준</h3>
+      <p>
+        받는사람, 전화번호, 주소가 모두 같은 주문은 하나의 택배로 간주합니다.
+        같은 이름이라도 전화번호나 주소가 다르면 다른 수령 건으로 분리합니다.
+      </p>
+
+      <h3>상품명 생성 방식</h3>
+      <p>
+        상품명과 옵션/사이즈를 합친 뒤 수량을 EA 단위로 붙입니다.
+        예를 들어 반팔티 XL 1개와 머플러 2개가 같은 수령인에게 있다면 상품명1에는
+        <b>반팔티 XL 1EA / 머플러 2EA</b>처럼 표시됩니다.
+      </p>
+    </section>
+
+    <section id="privacy" class="content-section">
+      <h2>개인정보 및 파일 처리 안내</h2>
+      <div class="policy-box">
+        업로드한 엑셀 파일은 서버로 전송하지 않고 현재 브라우저 안에서만 처리됩니다.
+        페이지를 새로고침하거나 브라우저를 닫으면 업로드한 원본 데이터는 이 페이지에 남지 않습니다.
+      </div>
+      <h3>브라우저에 저장되는 정보</h3>
+      <ul>
+        <li>일괄폼 미리보기 헤더명</li>
+        <li>각 헤더의 표시 정보 설정</li>
+        <li>사용자가 직접 지정한 출력 헤더 구성</li>
+      </ul>
+      <p>
+        위 설정은 사용 편의를 위해 현재 기기의 브라우저 저장소에만 저장됩니다.
+        수령인 이름, 전화번호, 주소, 주문 상품 데이터는 별도로 저장하지 않습니다.
+      </p>
+      <h3>광고 및 쿠키 안내</h3>
+      <p>
+        이 페이지에는 Google AdSense와 Kakao AdFit 광고 영역을 배치할 수 있습니다.
+        광고 플랫폼은 광고 제공, 부정 클릭 방지, 성과 측정 등을 위해 쿠키 또는 유사 기술을 사용할 수 있습니다.
+      </p>
+    </section>
+
+    <section class="ad-section" aria-label="광고 영역">
+      <div class="ad-label">광고</div>
+      <div class="ad-stack">
+        <div class="ad-slot" data-network="adsense" data-position="bottom">Google AdSense 광고 영역</div>
+      </div>
+    </section>
+
+    <section id="faq" class="content-section">
+      <h2>자주 묻는 질문</h2>
+      <h3>엑셀 컬럼명이 쇼핑몰마다 달라도 사용할 수 있나요?</h3>
+      <p>
+        사용할 수 있습니다. 자동 매핑이 틀리면 컬럼 자동 매핑 확인 영역에서 직접 선택하면 됩니다.
+      </p>
+      <h3>옵션이 배송메시지로 들어가면 어떻게 하나요?</h3>
+      <p>
+        옵션/사이즈 컬럼은 상품명1에 합쳐지도록 설계되어 있습니다.
+        그래도 원본 엑셀의 헤더가 특이한 경우 옵션/사이즈와 배송메시지 매핑을 직접 확인하세요.
+      </p>
+      <h3>헤더를 추가하면 데이터도 같이 나오나요?</h3>
+      <p>
+        헤더를 추가한 뒤 해당 헤더 아래의 표시 정보 선택 박스에서 받는사람, 전화번호, 주소, 상품명1, 배송메시지, 빈값 중 하나를 선택할 수 있습니다.
+      </p>
+      <h3>파일명은 바꿀 수 있나요?</h3>
+      <p>
+        다운로드 영역에서 파일명 중간 문구를 직접 입력할 수 있습니다.
+        최종 파일명은 날짜_입력값_택배일괄폼.xlsx 형식으로 생성됩니다.
+      </p>
+    </section>
+
+    <section id="contact" class="content-section">
+      <h2>운영 정보 및 문의</h2>
+      <p>
+        이 도구는 반복적인 쇼핑몰 주문 정리와 택배 일괄 접수 작업을 줄이기 위해 제작된 단일 페이지 웹 도구입니다.
+        기능 개선이나 오류 제보가 필요한 경우 아래 운영자 정보로 문의할 수 있습니다.
+      </p>
+      <ul>
+        <li>운영자: WOONIVERSE</li>
+        <li>문의: wooniverse.dev@gmail.com</li>
+        <li>TOOLS 더보기: <a href="https://wooniverse.cloud/tools" target="_blank" rel="noopener">https://wooniverse.cloud/tools</a></li>
+        <li>주요 기능: 주문 엑셀 분석, 수령인 기준 묶음, 상품/옵션/수량 요약, 일괄폼 엑셀 다운로드</li>
+      </ul>
+    </section>
+
+    <section class="ad-section" aria-label="광고 영역">
+      <div class="ad-label">광고</div>
+      <div class="ad-stack">
+        <div class="ad-slot" data-network="adfit" data-position="footer">Kakao AdFit 광고 영역</div>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      © WOONIVERSE. 택배 일괄폼 생성기 · 파일은 브라우저에서 처리되며 서버에 저장되지 않습니다.
+      <br />
+      <a href="https://wooniverse.cloud/tools" target="_blank" rel="noopener">WOONIVERSE TOOLS 더보기</a>
+    </footer>
+
+    <div id="actionsBar" class="footer-actions hidden">
+      <div class="filename-box">
+        <strong>다운로드 파일명</strong>
+        <div class="filename-input-row">
+          <span id="fileDatePrefix" class="code"></span>
+          <input id="customFileName" type="text" placeholder="예: 용인FC_온라인주문" maxlength="60" />
+          <span class="code">_택배일괄폼.xlsx</span>
+        </div>
+        <div class="small code"><span id="downloadName"></span></div>
+      </div>
+      <div class="btn-row">
+        <button id="downloadBtn" type="button" class="green">엑셀 일괄폼 다운로드</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "엑셀 컬럼명이 쇼핑몰마다 달라도 사용할 수 있나요?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "자동 매핑이 틀리면 컬럼 자동 매핑 확인 영역에서 직접 선택할 수 있습니다."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "업로드한 엑셀 파일은 서버에 저장되나요?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "업로드한 파일은 서버로 전송하지 않고 현재 브라우저 안에서만 처리됩니다."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "헤더를 추가하면 데이터도 같이 나오나요?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "헤더를 추가한 뒤 표시 정보 선택 박스에서 받는사람, 전화번호, 주소, 상품명1, 배송메시지, 빈값 중 하나를 선택할 수 있습니다."
+        }
+      }
+    ]
+  }
+  </script>
+
+  <script>
+    (function () {
+      const config = window.WOONIVERSE_AD_CONFIG || {};
+      const adsenseClient = String(config.adsenseClient || "");
+      let adsenseScriptPromise = null;
+      let adfitScriptLoaded = false;
+
+      function isRealAdsenseClient(value) {
+        return /^ca-pub-\d{8,}$/.test(String(value || ""));
+      }
+
+      function isRealAdSlot(value) {
+        return /^\d{4,}$/.test(String(value || ""));
+      }
+
+      function isRealAdfitUnit(value) {
+        return /^DAN-[A-Za-z0-9_-]{6,}$/.test(String(value || ""));
+      }
+
+      function loadAdSenseScript() {
+        if (adsenseScriptPromise) return adsenseScriptPromise;
+
+        adsenseScriptPromise = new Promise((resolve, reject) => {
+          if (!isRealAdsenseClient(adsenseClient)) {
+            reject(new Error("AdSense client ID is not configured."));
+            return;
+          }
+
+          const existing = document.querySelector("script[data-wooniverse-adsense]");
+          if (existing) {
+            resolve();
+            return;
+          }
+
+          const script = document.createElement("script");
+          script.async = true;
+          script.crossOrigin = "anonymous";
+          script.dataset.wooniverseAdsense = "1";
+          script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(adsenseClient)}`;
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+
+        return adsenseScriptPromise;
+      }
+
+      function renderAdSense(slotNode, slotId) {
+        if (!isRealAdsenseClient(adsenseClient) || !isRealAdSlot(slotId)) {
+          slotNode.textContent = "AdSense 광고 코드 설정 전입니다.";
+          return;
+        }
+
+        slotNode.innerHTML = "";
+        const ins = document.createElement("ins");
+        ins.className = "adsbygoogle";
+        ins.style.display = "block";
+        ins.dataset.adClient = adsenseClient;
+        ins.dataset.adSlot = String(slotId);
+        ins.dataset.adFormat = "auto";
+        ins.dataset.fullWidthResponsive = "true";
+        slotNode.appendChild(ins);
+
+        loadAdSenseScript()
+          .then(() => {
+            window.adsbygoogle = window.adsbygoogle || [];
+            window.adsbygoogle.push({});
+          })
+          .catch(() => {
+            slotNode.textContent = "AdSense 스크립트를 불러오지 못했습니다.";
+          });
+      }
+
+      function loadAdFitScript() {
+        if (adfitScriptLoaded) return;
+        adfitScriptLoaded = true;
+
+        const script = document.createElement("script");
+        script.async = true;
+        script.src = "https://t1.daumcdn.net/kas/static/ba.min.js";
+        document.body.appendChild(script);
+      }
+
+      function renderAdFit(slotNode, unitConfig) {
+        const unit = unitConfig && unitConfig.unit;
+        const width = unitConfig && unitConfig.width ? unitConfig.width : 320;
+        const height = unitConfig && unitConfig.height ? unitConfig.height : 100;
+
+        if (!isRealAdfitUnit(unit)) {
+          slotNode.textContent = "Kakao AdFit 광고 코드 설정 전입니다.";
+          return;
+        }
+
+        slotNode.innerHTML = "";
+        const ins = document.createElement("ins");
+        ins.className = "kakao_ad_area";
+        ins.style.display = "none";
+        ins.dataset.adUnit = String(unit);
+        ins.dataset.adWidth = String(width);
+        ins.dataset.adHeight = String(height);
+        slotNode.appendChild(ins);
+        loadAdFitScript();
+      }
+
+      function initAds() {
+        document.querySelectorAll(".ad-slot[data-network]").forEach((slotNode) => {
+          const network = slotNode.dataset.network;
+          const position = slotNode.dataset.position;
+
+          if (network === "adsense") {
+            const slotId = config.adsenseSlots && config.adsenseSlots[position];
+            renderAdSense(slotNode, slotId);
+          }
+
+          if (network === "adfit") {
+            const unitConfig = config.adfitUnits && config.adfitUnits[position];
+            renderAdFit(slotNode, unitConfig);
+          }
+        });
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initAds);
+      } else {
+        initAds();
+      }
+    })();
+  </script>
+
+  <script>
+    const state = {
+      workbook: null,
+      sheetName: "",
+      rows: [],
+      headerRowIndex: -1,
+      headers: [],
+      records: [],
+      mapping: {},
+      shipments: [],
+      productSummary: [],
+      warnings: [],
+      outputColumns: []
+    };
+
+    const requiredFields = ["receiver", "phone", "address", "product"];
+
+    const fieldLabels = {
+      receiver: "받는사람",
+      phone: "전화번호1",
+      zip: "우편번호",
+      address: "주소",
+      product: "상품명",
+      option: "옵션/사이즈",
+      qty: "수량",
+      msg: "배송메시지"
+    };
+
+    const STORAGE_KEY_OUTPUT_COLUMNS = "parcelBatchForm_outputColumns_v5_preview_editable";
+
+    const defaultOutputColumns = [
+      { key: "receiver", header: "받는사람", source: "receiver" },
+      { key: "phone", header: "전화번호1", source: "phone" },
+      { key: "zip", header: "우편번호", source: "zip" },
+      { key: "address", header: "주소", source: "address" },
+      { key: "qty", header: "수량(A타입)", source: "parcelQty" },
+      { key: "product", header: "상품명1", source: "productText" },
+      { key: "msg", header: "배송메시지", source: "msg" }
+    ];
+
+    const defaultOutputHeaders = {
+      receiver: "받는사람",
+      phone: "전화번호1",
+      zip: "우편번호",
+      address: "주소",
+      qty: "수량(A타입)",
+      product: "상품명1",
+      msg: "배송메시지"
+    };
+
+    const outputSourceLabels = {
+      receiver: "받는사람 표시",
+      phone: "전화번호1 표시",
+      zip: "우편번호 표시",
+      address: "주소 표시",
+      parcelQty: "수량(A타입) 표시",
+      productText: "상품명1 표시",
+      msg: "배송메시지 표시",
+      blank: "빈값 표시"
+    };
+
+    const selectors = {
+      receiver: document.getElementById("mapReceiver"),
+      phone: document.getElementById("mapPhone"),
+      zip: document.getElementById("mapZip"),
+      address: document.getElementById("mapAddress"),
+      product: document.getElementById("mapProduct"),
+      option: document.getElementById("mapOption"),
+      qty: document.getElementById("mapQty"),
+      msg: document.getElementById("mapMsg")
+    };
+
+    const keywordMap = {
+      receiver: [
+        "수령인", "받는사람", "받는 사람", "수취인", "받는분", "받는 분",
+        "수령자", "이름", "성명", "receiver", "name"
+      ],
+      phone: [
+        "수령인휴대전화", "수령인 휴대전화", "수령인전화번호", "수령인 전화번호",
+        "전화번호1", "전화번호", "휴대전화", "핸드폰", "연락처", "휴대폰",
+        "수취인전화", "받는분전화", "받는분 전화", "phone", "tel", "mobile"
+      ],
+      zip: [
+        "수령인우편번호", "수령인 우편번호", "우편번호", "받는분우편번호",
+        "받는분 우편번호", "zipcode", "zip", "postal"
+      ],
+      address: [
+        "수령인주소(전체)", "수령인 주소(전체)", "수령인주소", "수령인 주소",
+        "주소(전체)", "전체주소", "받는주소", "받는 주소", "배송지주소",
+        "배송지 주소", "주소", "address"
+      ],
+      product: [
+        "상품명(한국어 쇼핑몰)", "상품명", "제품명", "품목명", "주문상품명",
+        "주문 상품명", "상품", "품명", "product", "item"
+      ],
+      option: [
+        "상품옵션", "상품 옵션", "옵션명", "옵션", "사이즈", "size",
+        "색상", "컬러", "규격", "선택사항", "선택 옵션", "option"
+      ],
+      qty: [
+        "수량", "주문수량", "주문 수량", "구매수량", "구매 수량",
+        "상품수량", "상품 수량", "qty", "quantity", "ea"
+      ],
+      msg: [
+        "배송메시지", "배송메세지", "배송 메시지", "배송 메세지",
+        "배송시 요청사항", "배송시요청사항", "배송 요청사항", "배송요청사항",
+        "수령인배송메시지", "수령인 배송메시지", "수령인배송메세지", "수령인 배송메세지",
+        "요청사항", "요청 메세지", "요청메시지", "요청메세지",
+        "배송메모", "배송 메모", "배송비고", "배송 비고",
+        "deliverymessage", "message", "memo"
+      ]
+    };
+
+    const el = {
+      file: document.getElementById("excelFile"),
+      dropZone: document.getElementById("dropZone"),
+      resetBtn: document.getElementById("resetBtn"),
+      fileInfo: document.getElementById("fileInfo"),
+      errorBox: document.getElementById("errorBox"),
+      mappingCard: document.getElementById("mappingCard"),
+      mappingWarn: document.getElementById("mappingWarn"),
+      applyMapBtn: document.getElementById("applyMapBtn"),
+      statsCard: document.getElementById("statsCard"),
+      previewArea: document.getElementById("previewArea"),
+      productSummaryBody: document.getElementById("productSummaryBody"),
+      shipmentBody: document.getElementById("shipmentBody"),
+      statRawRows: document.getElementById("statRawRows"),
+      statShipments: document.getElementById("statShipments"),
+      statItems: document.getElementById("statItems"),
+      statProducts: document.getElementById("statProducts"),
+      productPreviewCount: document.getElementById("productPreviewCount"),
+      shipmentPreviewCount: document.getElementById("shipmentPreviewCount"),
+      actionsBar: document.getElementById("actionsBar"),
+      downloadBtn: document.getElementById("downloadBtn"),
+      downloadName: document.getElementById("downloadName"),
+      customFileName: document.getElementById("customFileName"),
+      fileDatePrefix: document.getElementById("fileDatePrefix"),
+      addHeaderBtn: document.getElementById("addHeaderBtn"),
+      resetHeaderBtn: document.getElementById("resetHeaderBtn"),
+      clearSavedHeaderBtn: document.getElementById("clearSavedHeaderBtn"),
+      headerSaveState: document.getElementById("headerSaveState"),
+      shipmentHead: document.getElementById("shipmentHead")
+    };
+
+    el.file.addEventListener("change", (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (file) readExcelFile(file);
+    });
+
+    el.resetBtn.addEventListener("click", resetAll);
+    el.applyMapBtn.addEventListener("click", () => {
+      collectMappingFromUI();
+      analyzeByMapping();
+      renderAll();
+    });
+    el.downloadBtn.addEventListener("click", downloadBatchForm);
+    el.customFileName.addEventListener("input", renderDownloadName);
+
+    el.addHeaderBtn.addEventListener("click", addOutputColumn);
+
+    el.resetHeaderBtn.addEventListener("click", () => {
+      resetOutputColumns();
+      saveOutputColumnsToDevice();
+      renderShipments();
+    });
+
+    el.clearSavedHeaderBtn.addEventListener("click", () => {
+      clearSavedOutputColumns();
+      resetOutputColumns();
+      renderShipments();
+    });
+
+    loadOutputColumnsFromDevice();
+    renderPreviewHeaders();
+
+    ["dragenter", "dragover"].forEach((name) => {
+      el.dropZone.addEventListener(name, (event) => {
+        event.preventDefault();
+        el.dropZone.classList.add("dragover");
+      });
+    });
+
+    ["dragleave", "drop"].forEach((name) => {
+      el.dropZone.addEventListener(name, (event) => {
+        event.preventDefault();
+        el.dropZone.classList.remove("dragover");
+      });
+    });
+
+    el.dropZone.addEventListener("drop", (event) => {
+      const file = event.dataTransfer.files && event.dataTransfer.files[0];
+      if (file) readExcelFile(file);
+    });
+
+    function resetAll() {
+      state.workbook = null;
+      state.sheetName = "";
+      state.rows = [];
+      state.headerRowIndex = -1;
+      state.headers = [];
+      state.records = [];
+      state.mapping = {};
+      state.shipments = [];
+      state.productSummary = [];
+      state.warnings = [];
+
+      el.file.value = "";
+      hide(el.fileInfo);
+      hide(el.errorBox);
+      hide(el.mappingCard);
+      hide(el.statsCard);
+      hide(el.previewArea);
+      hide(el.actionsBar);
+      hide(el.mappingWarn);
+      el.productSummaryBody.innerHTML = "";
+      el.shipmentBody.innerHTML = "";
+      el.customFileName.value = "";
+      loadOutputColumnsFromDevice();
+      renderPreviewHeaders();
+    }
+
+    function show(node) {
+      node.classList.remove("hidden");
+    }
+
+    function hide(node) {
+      node.classList.add("hidden");
+    }
+
+    function showError(message) {
+      el.errorBox.textContent = message;
+      show(el.errorBox);
+    }
+
+    function clearError() {
+      el.errorBox.textContent = "";
+      hide(el.errorBox);
+    }
+
+    function readExcelFile(file) {
+      resetAll();
+      clearError();
+
+      if (typeof XLSX === "undefined") {
+        showError("엑셀 라이브러리를 불러오지 못했습니다. 인터넷 연결 또는 CDN 차단 여부를 확인하세요.");
+        return;
+      }
+
+      const reader = new FileReader();
+
+      reader.onload = (event) => {
+        try {
+          const data = new Uint8Array(event.target.result);
+          const workbook = XLSX.read(data, { type: "array", cellDates: false });
+
+          if (!workbook.SheetNames.length) {
+            showError("시트를 찾을 수 없습니다.");
+            return;
+          }
+
+          const firstSheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[firstSheetName];
+          const rows = XLSX.utils.sheet_to_json(sheet, {
+            header: 1,
+            defval: "",
+            raw: false,
+            blankrows: false
+          });
+
+          if (!rows.length) {
+            showError("엑셀에 데이터가 없습니다.");
+            return;
+          }
+
+          state.workbook = workbook;
+          state.sheetName = firstSheetName;
+          state.rows = rows;
+          state.headerRowIndex = detectHeaderRow(rows);
+          buildHeadersAndRecords();
+          autoMapColumns();
+          populateMappingUI();
+          analyzeByMapping();
+          renderAll();
+
+          el.fileInfo.innerHTML = `
+            <b>${escapeHtml(file.name)}</b> 분석 완료 ·
+            시트: <b>${escapeHtml(firstSheetName)}</b> ·
+            감지된 헤더 행: <b>${state.headerRowIndex + 1}행</b>
+          `;
+          show(el.fileInfo);
+        } catch (error) {
+          console.error(error);
+          showError("엑셀을 읽는 중 오류가 발생했습니다. 파일 형식 또는 손상 여부를 확인하세요.");
+        }
+      };
+
+      reader.onerror = () => {
+        showError("파일을 읽지 못했습니다.");
+      };
+
+      reader.readAsArrayBuffer(file);
+    }
+
+    function detectHeaderRow(rows) {
+      let bestIndex = 0;
+      let bestScore = -1;
+      const limit = Math.min(rows.length, 25);
+
+      for (let i = 0; i < limit; i++) {
+        const row = rows[i] || [];
+        const joined = row.map(normalizeHeaderText).join(" ");
+        const nonEmptyCount = row.filter((cell) => String(cell).trim() !== "").length;
+
+        let score = nonEmptyCount * 0.2;
+
+        Object.values(keywordMap).forEach((keywords) => {
+          keywords.forEach((keyword) => {
+            const key = normalizeHeaderText(keyword);
+            if (key && joined.includes(key)) score += 4;
+          });
+        });
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestIndex = i;
+        }
+      }
+
+      return bestIndex;
+    }
+
+    function buildHeadersAndRecords() {
+      const headerRow = state.rows[state.headerRowIndex] || [];
+      const used = new Map();
+
+      state.headers = headerRow.map((cell, index) => {
+        let base = String(cell || "").trim();
+        if (!base) base = `빈헤더_${index + 1}`;
+
+        if (!used.has(base)) {
+          used.set(base, 1);
+          return base;
+        }
+
+        const next = used.get(base) + 1;
+        used.set(base, next);
+        return `${base}_${next}`;
+      });
+
+      state.records = [];
+
+      for (let r = state.headerRowIndex + 1; r < state.rows.length; r++) {
+        const row = state.rows[r] || [];
+        const isEmpty = row.every((cell) => String(cell || "").trim() === "");
+        if (isEmpty) continue;
+
+        const obj = {
+          __rowNumber: r + 1,
+          __raw: row
+        };
+
+        state.headers.forEach((header, c) => {
+          obj[header] = cellToText(row[c]);
+        });
+
+        state.records.push(obj);
+      }
+    }
+
+    function autoMapColumns() {
+      const mapping = {};
+
+      Object.keys(keywordMap).forEach((field) => {
+        mapping[field] = findBestHeader(field);
+      });
+
+      state.mapping = mapping;
+    }
+
+    function findBestHeader(field) {
+      const keywords = keywordMap[field].map(normalizeHeaderText);
+      let best = "";
+      let bestScore = 0;
+
+      const blockedTokens = {
+        receiver: ["주문자", "구매자", "결제자", "sender", "보내는"],
+        phone: ["주문자", "구매자", "결제자", "sender", "보내는"],
+        zip: ["주문자", "구매자", "결제자", "sender", "보내는"],
+        address: ["주문자", "구매자", "결제자", "sender", "보내는"],
+        product: ["배송메시지", "배송메세지", "요청사항", "메모", "비고", "주소", "전화", "우편"],
+        option: ["배송메시지", "배송메세지", "요청사항", "배송메모", "배송비고", "주소", "전화", "우편"],
+        qty: ["금액", "가격", "단가", "결제", "배송비"],
+        msg: [
+          "상품옵션", "상품 옵션", "옵션", "사이즈", "size", "색상", "컬러", "color",
+          "규격", "상품명", "제품명", "품목명", "상품", "수량", "qty", "quantity",
+          "주소", "전화", "우편", "receiver", "product", "item"
+        ]
+      };
+
+      state.headers.forEach((header) => {
+        const normalized = normalizeHeaderText(header);
+        let score = 0;
+
+        const blocked = (blockedTokens[field] || []).some((token) => {
+          const nt = normalizeHeaderText(token);
+          return nt && normalized.includes(nt);
+        });
+
+        // 배송메시지는 옵션/상품/주소/전화 계열 컬럼을 절대 자동 선택하지 않음.
+        if (field === "msg" && blocked) return;
+
+        keywords.forEach((keyword) => {
+          if (!keyword) return;
+          if (normalized === keyword) score += 120;
+          else if (normalized.includes(keyword)) score += 60;
+          else if (keyword.includes(normalized) && normalized.length >= 2) score += 15;
+        });
+
+        // 필드별 혼동 방지. 엑셀이 알아서 정리되면 인류가 이렇게 고생하지 않았겠죠.
+        if (blocked) score -= 120;
+
+        if (field === "product" && normalized.includes("옵션")) score -= 80;
+        if (field === "option" && normalized.includes("상품명") && !normalized.includes("옵션")) score -= 60;
+        if (field === "option" && (normalized.includes("옵션") || normalized.includes("사이즈") || normalized.includes("size"))) score += 80;
+        if (field === "msg" && (normalized.includes("배송") || normalized.includes("요청") || normalized.includes("메시지") || normalized.includes("메세지"))) score += 40;
+
+        if (score > bestScore) {
+          bestScore = score;
+          best = header;
+        }
+      });
+
+      return bestScore > 0 ? best : "";
+    }
+
+    function populateMappingUI() {
+      Object.entries(selectors).forEach(([field, select]) => {
+        select.innerHTML = "";
+
+        const empty = document.createElement("option");
+        empty.value = "";
+        empty.textContent = field === "qty" ? "선택 안 함 - 기본 1" : "선택 안 함";
+        select.appendChild(empty);
+
+        state.headers.forEach((header) => {
+          const option = document.createElement("option");
+          option.value = header;
+          option.textContent = header;
+          select.appendChild(option);
+        });
+
+        select.value = state.mapping[field] || "";
+      });
+
+      show(el.mappingCard);
+    }
+
+    function collectMappingFromUI() {
+      Object.entries(selectors).forEach(([field, select]) => {
+        state.mapping[field] = select.value || "";
+      });
+    }
+
+    function analyzeByMapping() {
+      state.warnings = [];
+
+      preventMessageColumnConflicts();
+
+      const missing = requiredFields.filter((field) => !state.mapping[field]);
+      if (missing.length) {
+        state.warnings.push(`필수 컬럼 누락: ${missing.map((f) => fieldLabels[f]).join(", ")}`);
+      }
+
+      const productMap = new Map();
+      const shipmentMap = new Map();
+
+      let totalQty = 0;
+      let usableRows = 0;
+
+      state.records.forEach((row) => {
+        const receiver = cleanSpaces(getMapped(row, "receiver"));
+        const phone = cleanPhoneDisplay(getMapped(row, "phone"));
+        const zip = cleanSpaces(getMapped(row, "zip"));
+        const address = cleanSpaces(getMapped(row, "address"));
+        const product = cleanSpaces(getMapped(row, "product"));
+        const option = cleanSpaces(getMapped(row, "option"));
+        const qty = parseQty(getMapped(row, "qty"));
+
+        if (!receiver && !phone && !address && !product) return;
+        usableRows++;
+
+        if (!receiver || !phone || !address || !product) {
+          state.warnings.push(`${row.__rowNumber}행: 받는사람/전화번호/주소/상품명 중 빈 값이 있습니다.`);
+        }
+
+        const itemName = buildItemName(product, option);
+        if (!itemName) return;
+
+        totalQty += qty;
+
+        const productKey = normalizeForKey(itemName);
+        if (!productMap.has(productKey)) {
+          productMap.set(productKey, {
+            itemName,
+            qty: 0
+          });
+        }
+        productMap.get(productKey).qty += qty;
+
+        const shipmentKey = [
+          normalizeForKey(receiver),
+          normalizePhoneForKey(phone),
+          normalizeAddressForKey(address)
+        ].join("|");
+
+        if (!shipmentMap.has(shipmentKey)) {
+          shipmentMap.set(shipmentKey, {
+            receiver,
+            phone,
+            zip,
+            address,
+            parcelQty: 1,
+            msgSet: new Set(),
+            itemMap: new Map(),
+            sourceRows: []
+          });
+        }
+
+        const shipment = shipmentMap.get(shipmentKey);
+        shipment.sourceRows.push(row.__rowNumber);
+
+        if (!shipment.zip && zip) shipment.zip = zip;
+
+        const msg = cleanSpaces(getMapped(row, "msg"));
+        if (msg) shipment.msgSet.add(msg);
+
+        if (!shipment.itemMap.has(productKey)) {
+          shipment.itemMap.set(productKey, {
+            itemName,
+            qty: 0
+          });
+        }
+        shipment.itemMap.get(productKey).qty += qty;
+      });
+
+      state.productSummary = Array.from(productMap.values())
+        .sort((a, b) => {
+          if (b.qty !== a.qty) return b.qty - a.qty;
+          return a.itemName.localeCompare(b.itemName, "ko");
+        });
+
+      state.shipments = Array.from(shipmentMap.values()).map((shipment) => {
+        const items = Array.from(shipment.itemMap.values()).map((item) => {
+          return `${item.itemName} ${formatQty(item.qty)}EA`;
+        });
+
+        return {
+          receiver: shipment.receiver,
+          phone: shipment.phone,
+          zip: shipment.zip,
+          address: shipment.address,
+          parcelQty: 1,
+          productText: items.join(" / "),
+          msg: Array.from(shipment.msgSet).join(" / "),
+          sourceRows: shipment.sourceRows
+        };
+      });
+
+      state.shipments.sort((a, b) => {
+        const nameCompare = a.receiver.localeCompare(b.receiver, "ko");
+        if (nameCompare !== 0) return nameCompare;
+        const phoneCompare = a.phone.localeCompare(b.phone, "ko");
+        if (phoneCompare !== 0) return phoneCompare;
+        return a.address.localeCompare(b.address, "ko");
+      });
+
+      state.totalQty = totalQty;
+      state.usableRows = usableRows;
+    }
+
+    function preventMessageColumnConflicts() {
+      const msgHeader = state.mapping.msg;
+      if (!msgHeader) return;
+
+      const msgNorm = normalizeHeaderText(msgHeader);
+      const forbiddenWords = [
+        "상품옵션", "상품 옵션", "옵션", "사이즈", "size", "색상", "컬러", "color",
+        "규격", "상품명", "제품명", "품목명", "상품", "수량", "qty", "quantity"
+      ].map(normalizeHeaderText);
+
+      const sameAsProductOrOption =
+        msgHeader === state.mapping.product ||
+        msgHeader === state.mapping.option;
+
+      const looksLikeProductData = forbiddenWords.some((word) => word && msgNorm.includes(word));
+
+      if (sameAsProductOrOption || looksLikeProductData) {
+        state.warnings.push(`배송메시지 컬럼이 상품/옵션 계열("${msgHeader}")로 잡혀 있어 배송메시지 매핑을 비웠습니다.`);
+        state.mapping.msg = "";
+        if (selectors.msg) selectors.msg.value = "";
+      }
+    }
+
+    function renderAll() {
+      renderWarnings();
+      renderStats();
+      renderProductSummary();
+      renderShipments();
+      renderDownloadName();
+      renderPreviewHeaders();
+
+      show(el.statsCard);
+      show(el.previewArea);
+      show(el.actionsBar);
+      el.downloadBtn.disabled = !canDownload();
+    }
+
+    function renderWarnings() {
+      const unique = Array.from(new Set(state.warnings)).slice(0, 40);
+
+      if (!unique.length) {
+        hide(el.mappingWarn);
+        return;
+      }
+
+      el.mappingWarn.innerHTML = `
+        <b>확인 필요</b><br>
+        ${unique.map(escapeHtml).join("<br>")}
+        ${state.warnings.length > 40 ? `<br>외 ${state.warnings.length - 40}건 더 있음` : ""}
+      `;
+      show(el.mappingWarn);
+    }
+
+    function renderStats() {
+      el.statRawRows.textContent = String(state.usableRows || state.records.length || 0);
+      el.statShipments.textContent = String(state.shipments.length);
+      el.statItems.textContent = String(formatQty(state.totalQty || 0));
+      el.statProducts.textContent = String(state.productSummary.length);
+    }
+
+    function renderProductSummary() {
+      const max = 500;
+      const list = state.productSummary.slice(0, max);
+
+      el.productSummaryBody.innerHTML = list.map((item, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td class="long">${escapeHtml(item.itemName)}</td>
+          <td><span class="pill">${escapeHtml(formatQty(item.qty))}EA</span></td>
+        </tr>
+      `).join("");
+
+      el.productPreviewCount.textContent =
+        state.productSummary.length > max
+          ? `${max}개만 표시 / 전체 ${state.productSummary.length}개`
+          : `전체 ${state.productSummary.length}개`;
+    }
+
+    function renderShipments() {
+      renderPreviewHeaders();
+
+      const max = 500;
+      const list = state.shipments.slice(0, max);
+
+      el.shipmentBody.innerHTML = list.map((row) => {
+        const cells = getOutputColumns().map((column) => {
+          const value = getOutputColumnValue(row, column);
+          const longClass = ["address", "productText", "msg"].includes(column.source) ? "long" : "";
+          return `<td class="${longClass}">${escapeHtml(value)}</td>`;
+        }).join("");
+
+        return `<tr>${cells}</tr>`;
+      }).join("");
+
+      el.shipmentPreviewCount.textContent =
+        state.shipments.length > max
+          ? `${max}건만 표시 / 전체 ${state.shipments.length}건`
+          : `전체 ${state.shipments.length}건`;
+    }
+
+    function renderDownloadName() {
+      const date = getTodayYmd();
+      const custom = getSafeCustomFileName();
+      const middle = custom ? `_${custom}` : "";
+      const fileName = `${date}${middle}_택배일괄폼.xlsx`;
+
+      el.fileDatePrefix.textContent = `${date}_`;
+      el.downloadName.textContent = fileName;
+    }
+
+    function canDownload() {
+      const missing = requiredFields.some((field) => !state.mapping[field]);
+      return !missing && state.shipments.length > 0;
+    }
+
+    function getOutputColumns() {
+      if (!Array.isArray(state.outputColumns) || state.outputColumns.length === 0) {
+        state.outputColumns = cloneDefaultOutputColumns();
+      }
+
+      return state.outputColumns;
+    }
+
+    function cloneDefaultOutputColumns() {
+      return defaultOutputColumns.map((column) => ({ ...column }));
+    }
+
+    function getOutputHeaders() {
+      return getOutputColumns().map((column, index) => {
+        const header = String(column.header || "").trim();
+        return header || `컬럼${index + 1}`;
+      });
+    }
+
+    function resetOutputColumns() {
+      state.outputColumns = cloneDefaultOutputColumns();
+      markHeaderSavedState("기본값으로 복구됨");
+    }
+
+    function addOutputColumn() {
+      const columns = getOutputColumns();
+      columns.push({
+        key: `custom_${Date.now()}`,
+        header: `추가헤더${columns.length + 1}`,
+        source: "blank"
+      });
+
+      saveOutputColumnsToDevice();
+      renderShipments();
+    }
+
+    function deleteOutputColumn(index) {
+      const columns = getOutputColumns();
+
+      if (columns.length <= 1) {
+        alert("헤더는 최소 1개 이상 필요합니다.");
+        return;
+      }
+
+      columns.splice(index, 1);
+      saveOutputColumnsToDevice();
+      renderShipments();
+    }
+
+    function updateOutputColumnHeader(index, value) {
+      const columns = getOutputColumns();
+      if (!columns[index]) return;
+
+      columns[index].header = value;
+      saveOutputColumnsToDevice();
+    }
+
+    function updateOutputColumnSource(index, value) {
+      const columns = getOutputColumns();
+      if (!columns[index]) return;
+
+      const allowedSources = new Set(Object.keys(outputSourceLabels));
+      columns[index].source = allowedSources.has(value) ? value : "blank";
+
+      saveOutputColumnsToDevice();
+      renderShipments();
+    }
+
+    function getOutputColumnValue(row, column) {
+      switch (column.source) {
+        case "receiver":
+          return row.receiver;
+        case "phone":
+          return row.phone;
+        case "zip":
+          return row.zip;
+        case "address":
+          return row.address;
+        case "parcelQty":
+          return row.parcelQty;
+        case "productText":
+          return row.productText;
+        case "msg":
+          return row.msg;
+        case "blank":
+        default:
+          return "";
+      }
+    }
+
+    function saveOutputColumnsToDevice() {
+      try {
+        const cleanColumns = getOutputColumns().map((column, index) => ({
+          key: String(column.key || `col_${index}`),
+          header: String(column.header || "").trim(),
+          source: String(column.source || "blank")
+        }));
+
+        localStorage.setItem(STORAGE_KEY_OUTPUT_COLUMNS, JSON.stringify(cleanColumns));
+        markHeaderSavedState("기기에 자동 저장됨");
+      } catch (error) {
+        console.error(error);
+        markHeaderSavedState("저장 실패", true);
+      }
+    }
+
+    function loadOutputColumnsFromDevice() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_OUTPUT_COLUMNS);
+        if (!raw) {
+          state.outputColumns = cloneDefaultOutputColumns();
+          markHeaderSavedState("기본값 사용 중");
+          return;
+        }
+
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed) || !parsed.length) {
+          state.outputColumns = cloneDefaultOutputColumns();
+          markHeaderSavedState("기본값 사용 중");
+          return;
+        }
+
+        const allowedSources = new Set(Object.keys(outputSourceLabels));
+
+        state.outputColumns = parsed.map((column, index) => ({
+          key: String(column.key || `col_${index}`),
+          header: String(column.header || `컬럼${index + 1}`),
+          source: allowedSources.has(column.source) ? column.source : "blank"
+        }));
+
+        markHeaderSavedState("저장값 불러옴");
+      } catch (error) {
+        console.error(error);
+        state.outputColumns = cloneDefaultOutputColumns();
+        markHeaderSavedState("저장값 오류로 기본값 사용", true);
+      }
+    }
+
+    function clearSavedOutputColumns() {
+      try {
+        localStorage.removeItem(STORAGE_KEY_OUTPUT_COLUMNS);
+        markHeaderSavedState("기기 저장값 삭제됨");
+      } catch (error) {
+        console.error(error);
+        markHeaderSavedState("삭제 실패", true);
+      }
+    }
+
+    function markHeaderSavedState(message, isError = false) {
+      if (!el.headerSaveState) return;
+
+      el.headerSaveState.textContent = message;
+
+      if (isError) {
+        el.headerSaveState.style.background = "#fef2f2";
+        el.headerSaveState.style.color = "#991b1b";
+        el.headerSaveState.style.borderColor = "#fecaca";
+      } else {
+        el.headerSaveState.style.background = "#f0fdf4";
+        el.headerSaveState.style.color = "#166534";
+        el.headerSaveState.style.borderColor = "#bbf7d0";
+      }
+    }
+
+    function renderPreviewHeaders() {
+      const columns = getOutputColumns();
+
+      el.shipmentHead.innerHTML = `
+        <tr>
+          ${columns.map((column, index) => {
+            const selectedSource = outputSourceLabels[column.source] ? column.source : "blank";
+            const sourceOptions = Object.entries(outputSourceLabels).map(([value, label]) => {
+              return `<option value="${escapeHtml(value)}" ${selectedSource === value ? "selected" : ""}>${escapeHtml(label)}</option>`;
+            }).join("");
+
+            return `
+              <th class="preview-header-cell">
+                <div class="preview-header-editor">
+                  <input
+                    class="preview-header-input"
+                    type="text"
+                    value="${escapeHtml(column.header || `컬럼${index + 1}`)}"
+                    aria-label="${index + 1}열 헤더명"
+                    data-header-index="${index}"
+                  />
+                  <button
+                    type="button"
+                    class="preview-header-delete"
+                    title="헤더 삭제"
+                    data-delete-index="${index}"
+                    ${columns.length <= 1 ? "disabled" : ""}
+                  >×</button>
+                  <select
+                    class="preview-header-source"
+                    aria-label="${index + 1}열 표시 정보"
+                    data-source-index="${index}"
+                  >
+                    ${sourceOptions}
+                  </select>
+                </div>
+              </th>
+            `;
+          }).join("")}
+        </tr>
+      `;
+
+      el.shipmentHead.querySelectorAll("[data-header-index]").forEach((input) => {
+        input.addEventListener("input", (event) => {
+          const index = Number(event.target.dataset.headerIndex);
+          updateOutputColumnHeader(index, event.target.value);
+        });
+      });
+
+      el.shipmentHead.querySelectorAll("[data-source-index]").forEach((select) => {
+        select.addEventListener("change", (event) => {
+          const index = Number(event.target.dataset.sourceIndex);
+          updateOutputColumnSource(index, event.target.value);
+        });
+      });
+
+      el.shipmentHead.querySelectorAll("[data-delete-index]").forEach((button) => {
+        button.addEventListener("click", (event) => {
+          const index = Number(event.currentTarget.dataset.deleteIndex);
+          deleteOutputColumn(index);
+        });
+      });
+    }
+
+    function downloadBatchForm() {
+      if (!canDownload()) {
+        showError("필수 컬럼 매핑을 확인하세요. 받는사람, 전화번호1, 주소, 상품명은 반드시 필요합니다.");
+        return;
+      }
+
+      const header = getOutputHeaders();
+
+      const body = state.shipments.map((row) => {
+        return getOutputColumns().map((column) => getOutputColumnValue(row, column));
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet([header, ...body]);
+
+      ws["!cols"] = getOutputColumns().map((column) => {
+        if (column.source === "address") return { wch: 45 };
+        if (column.source === "productText") return { wch: 70 };
+        if (column.source === "msg") return { wch: 35 };
+        if (column.source === "phone") return { wch: 18 };
+        if (column.source === "zip" || column.source === "parcelQty") return { wch: 12 };
+        return { wch: Math.max(14, String(column.header || "").length + 6) };
+      });
+
+      const range = XLSX.utils.decode_range(ws["!ref"]);
+      const outputColumns = getOutputColumns();
+
+      for (let R = range.s.r; R <= range.e.r; R++) {
+        for (let C = range.s.c; C <= range.e.c; C++) {
+          const addr = XLSX.utils.encode_cell({ r: R, c: C });
+          if (!ws[addr]) continue;
+          const source = outputColumns[C] ? outputColumns[C].source : "";
+          ws[addr].t = source === "parcelQty" && R > 0 ? "n" : "s";
+        }
+      }
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "일괄폼");
+
+      const fileName = buildDownloadFileName();
+      XLSX.writeFile(wb, fileName);
+    }
+
+    function getMapped(row, field) {
+      const header = state.mapping[field];
+      if (!header) return "";
+      return cellToText(row[header]);
+    }
+
+    function buildItemName(product, option) {
+      const p = cleanSpaces(product);
+      const o = cleanSpaces(option);
+
+      if (p && o) {
+        const np = normalizeForKey(p);
+        const no = normalizeForKey(o);
+
+        // 상품명 안에 옵션 문자열이 이미 들어 있으면 중복으로 붙이지 않음
+        if (np.includes(no)) return p;
+
+        // 옵션 컬럼에 상품명까지 같이 들어간 특이 케이스 보정
+        if (no.includes(np)) return o;
+
+        return `${p} ${o}`;
+      }
+
+      return p || o || "";
+    }
+
+    function parseQty(value) {
+      const raw = String(value || "").trim();
+
+      if (!raw) return 1;
+
+      const normalized = raw
+        .replace(/,/g, "")
+        .replace(/[０-９]/g, (digit) => String.fromCharCode(digit.charCodeAt(0) - 0xFEE0));
+
+      const match = normalized.match(/-?\d+(\.\d+)?/);
+      if (!match) return 1;
+
+      const num = Number(match[0]);
+
+      if (!Number.isFinite(num) || num <= 0) return 1;
+
+      return num;
+    }
+
+    function formatQty(num) {
+      const n = Number(num);
+      if (!Number.isFinite(n)) return "0";
+      return Number.isInteger(n) ? String(n) : String(Number(n.toFixed(2)));
+    }
+
+    function cellToText(value) {
+      if (value === null || value === undefined) return "";
+      return String(value).replace(/\u00a0/g, " ").trim();
+    }
+
+    function cleanSpaces(value) {
+      return cellToText(value).replace(/\s+/g, " ").trim();
+    }
+
+    function cleanPhoneDisplay(value) {
+      const text = cellToText(value);
+
+      if (!text) return "";
+
+      // 엑셀에서 1.010E+10처럼 깨진 경우는 완벽 복원이 어렵지만 가능한 일반 숫자는 보정
+      if (/^\d+(\.0+)?$/.test(text)) {
+        return text.replace(/\.0+$/, "");
+      }
+
+      return text.replace(/\s+/g, "").trim();
+    }
+
+    function normalizePhoneForKey(value) {
+      return cellToText(value).replace(/\D/g, "");
+    }
+
+    function normalizeAddressForKey(value) {
+      return cellToText(value)
+        .toLowerCase()
+        .replace(/\s+/g, "")
+        .replace(/[()［］\[\]{}]/g, "");
+    }
+
+    function normalizeForKey(value) {
+      return cellToText(value)
+        .toLowerCase()
+        .replace(/\s+/g, "")
+        .replace(/[()［］\[\]{}]/g, "")
+        .trim();
+    }
+
+    function normalizeHeaderText(value) {
+      return cellToText(value)
+        .toLowerCase()
+        .replace(/\s+/g, "")
+        .replace(/[()［］\[\]{}_\-\/\\.:]/g, "")
+        .trim();
+    }
+
+    function buildDownloadFileName() {
+      const date = getTodayYmd();
+      const custom = getSafeCustomFileName();
+      const middle = custom ? `_${custom}` : "";
+      return `${date}${middle}_택배일괄폼.xlsx`;
+    }
+
+    function getSafeCustomFileName() {
+      const raw = el.customFileName ? el.customFileName.value : "";
+      return sanitizeFileNamePart(raw);
+    }
+
+    function sanitizeFileNamePart(value) {
+      return String(value || "")
+        .trim()
+        .replace(/[\\/:*?"<>|]/g, "")
+        .replace(/\s+/g, "_")
+        .replace(/_+/g, "_")
+        .replace(/^_+|_+$/g, "");
+    }
+
+    function getTodayYmd() {
+      const date = new Date();
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, "0");
+      const d = String(date.getDate()).padStart(2, "0");
+      return `${y}${m}${d}`;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>
