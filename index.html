@@ -34,7 +34,9 @@
       },
       adfitUnits: {
         middle: { unit: "DAN-AZfmx8v5KITT1Qk3", width: 320, height: 100 },
-        footer: { unit: "DAN-tRG0yKzKoSrjpTe6", width: 320, height: 100 }
+        footer: { unit: "DAN-tRG0yKzKoSrjpTe6", width: 320, height: 100 },
+        sideLeft: { unit: "DAN-t4mwiM4unXvqT8PH", width: 160, height: 600 },
+        sideRight: { unit: "DAN-IHPopSQA8EJcG2NI", width: 160, height: 600 }
       }
     };
   </script>
@@ -652,6 +654,60 @@
       border: 0;
     }
 
+    /* 좌우 160x600 Kakao AdFit 고정 광고 + 중간/하단 320x100 AdFit 광고: 외곽 변형 없이 원본 크기 유지 */
+    .side-ad {
+      position: fixed;
+      top: 120px;
+      z-index: 20;
+      width: 160px;
+      height: 600px;
+      padding: 0;
+      margin: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      overflow: visible;
+    }
+
+    .side-ad-left {
+      left: max(12px, calc((100vw - 1320px) / 2 - 184px));
+    }
+
+    .side-ad-right {
+      right: max(12px, calc((100vw - 1320px) / 2 - 184px));
+    }
+
+    .side-ad .side-ad-slot {
+      width: 160px;
+      height: 600px;
+      min-height: 0;
+      display: block;
+      padding: 0;
+      margin: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      color: transparent;
+      font-size: 0;
+      line-height: 0;
+      text-align: left;
+      overflow: visible;
+    }
+
+    .side-ad .kakao_ad_area {
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+
+    @media (max-width: 1687px) {
+      .side-ad {
+        display: none;
+      }
+    }
+
     .content-section {
       background: var(--card);
       border: 1px solid var(--line);
@@ -788,6 +844,14 @@
 </head>
 
 <body>
+  <aside class="side-ad side-ad-left" aria-label="좌측 광고 영역">
+    <div class="ad-slot side-ad-slot" data-network="adfit" data-position="sideLeft">Kakao AdFit 좌측 광고 영역</div>
+  </aside>
+
+  <aside class="side-ad side-ad-right" aria-label="우측 광고 영역">
+    <div class="ad-slot side-ad-slot" data-network="adfit" data-position="sideRight">Kakao AdFit 우측 광고 영역</div>
+  </aside>
+
   <div class="wrap">
     <div class="top">
       <section class="hero">
@@ -903,9 +967,10 @@
 
       <div id="mappingWarn" class="warn-box hidden"></div>
     </section>
-<section class="ad-section adfit-section" aria-label="광고 영역">
+
+    <section class="ad-section adfit-section" aria-label="Kakao AdFit 중간 광고 영역">
       <div class="ad-stack">
-        <div class="ad-slot" data-network="adfit" data-position="middle">Kakao AdFit 광고 영역</div>
+        <div class="ad-slot" data-network="adfit" data-position="middle">Kakao AdFit 중간 광고 영역</div>
       </div>
     </section>
 
@@ -1082,9 +1147,9 @@
       </ul>
     </section>
 
-    <section class="ad-section adfit-section" aria-label="광고 영역">
+    <section class="ad-section adfit-section" aria-label="Kakao AdFit 하단 광고 영역">
       <div class="ad-stack">
-        <div class="ad-slot" data-network="adfit" data-position="footer">Kakao AdFit 광고 영역</div>
+        <div class="ad-slot" data-network="adfit" data-position="footer">Kakao AdFit 하단 광고 영역</div>
       </div>
     </section>
 
@@ -1258,6 +1323,14 @@
           }
 
           if (network === "adfit") {
+            const isSideAd = position === "sideLeft" || position === "sideRight";
+
+            // 좌우 160x600 광고는 본문을 가리지 않는 넓은 화면에서만 로드합니다.
+            if (isSideAd && window.matchMedia("(max-width: 1687px)").matches) {
+              slotNode.innerHTML = "";
+              return;
+            }
+
             const unitConfig = config.adfitUnits && config.adfitUnits[position];
             renderAdFit(slotNode, unitConfig);
           }
