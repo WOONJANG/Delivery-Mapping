@@ -656,9 +656,10 @@
 
     /* 좌우 160x600 Kakao AdFit 고정 광고 + 중간/하단 320x100 AdFit 광고: 외곽 변형 없이 원본 크기 유지 */
     .side-ad {
+      display: none;
       position: fixed;
       top: 120px;
-      z-index: 20;
+      z-index: 2;
       width: 160px;
       height: 600px;
       padding: 0;
@@ -668,14 +669,6 @@
       background: transparent;
       box-shadow: none;
       overflow: visible;
-    }
-
-    .side-ad-left {
-      left: max(12px, calc((100vw - 1320px) / 2 - 184px));
-    }
-
-    .side-ad-right {
-      right: max(12px, calc((100vw - 1320px) / 2 - 184px));
     }
 
     .side-ad .side-ad-slot {
@@ -702,9 +695,18 @@
       border: 0;
     }
 
-    @media (max-width: 1687px) {
+    /* 본문 1320px + 좌우 광고 160px + 간격 24px씩 확보되는 화면에서만 노출 */
+    @media (min-width: 1800px) {
       .side-ad {
-        display: none;
+        display: block;
+      }
+
+      .side-ad-left {
+        left: calc((100vw - 1320px) / 2 - 184px);
+      }
+
+      .side-ad-right {
+        right: calc((100vw - 1320px) / 2 - 184px);
       }
     }
 
@@ -1326,7 +1328,7 @@
             const isSideAd = position === "sideLeft" || position === "sideRight";
 
             // 좌우 160x600 광고는 본문을 가리지 않는 넓은 화면에서만 로드합니다.
-            if (isSideAd && window.matchMedia("(max-width: 1687px)").matches) {
+            if (isSideAd && !window.matchMedia("(min-width: 1800px)").matches) {
               slotNode.innerHTML = "";
               return;
             }
