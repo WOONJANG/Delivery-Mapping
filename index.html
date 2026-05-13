@@ -611,6 +611,47 @@
       min-height: 90px;
     }
 
+    /* Kakao AdFit 심사용: 광고 외곽 변형 제거 */
+    .adfit-section {
+      margin: 18px 0;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .adfit-section .ad-stack {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0;
+    }
+
+    .adfit-section .ad-slot[data-network="adfit"] {
+      width: 320px;
+      height: 100px;
+      min-height: 0;
+      padding: 0;
+      margin: 0 auto;
+      display: block;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      color: transparent;
+      font-size: 0;
+      line-height: 0;
+      text-align: left;
+      overflow: visible;
+    }
+
+    .adfit-section .ad-slot[data-network="adfit"] .kakao_ad_area {
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+
     .content-section {
       background: var(--card);
       border: 1px solid var(--line);
@@ -862,8 +903,7 @@
 
       <div id="mappingWarn" class="warn-box hidden"></div>
     </section>
-<section class="ad-section" aria-label="광고 영역">
-      <div class="ad-label">광고</div>
+<section class="ad-section adfit-section" aria-label="광고 영역">
       <div class="ad-stack">
         <div class="ad-slot" data-network="adfit" data-position="middle">Kakao AdFit 광고 영역</div>
       </div>
@@ -1042,8 +1082,7 @@
       </ul>
     </section>
 
-    <section class="ad-section" aria-label="광고 영역">
-      <div class="ad-label">광고</div>
+    <section class="ad-section adfit-section" aria-label="광고 영역">
       <div class="ad-stack">
         <div class="ad-slot" data-network="adfit" data-position="footer">Kakao AdFit 광고 영역</div>
       </div>
