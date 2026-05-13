@@ -492,6 +492,50 @@
       align-items: start;
     }
 
+    /* 상품 요약/미리보기 영역: 위 분석 결과 카드와 동일한 본문 폭 유지 */
+    #previewArea,
+    #previewArea .card {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+    }
+
+    .product-summary-card {
+      width: 100%;
+      max-width: 100%;
+      overflow: hidden;
+    }
+
+    .product-summary-card .table-wrap {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    .product-summary-card .product-table {
+      width: 100%;
+      min-width: 0;
+      table-layout: fixed;
+    }
+
+    .product-summary-card .product-table th:nth-child(1),
+    .product-summary-card .product-table td:nth-child(1) {
+      width: 70px;
+    }
+
+    .product-summary-card .product-table th:nth-child(3),
+    .product-summary-card .product-table td:nth-child(3) {
+      width: 110px;
+    }
+
+    .product-summary-card .product-table th:nth-child(2),
+    .product-summary-card .product-table td:nth-child(2) {
+      white-space: normal;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
+    }
+
     .footer-actions {
       position: sticky;
       bottom: 16px;
@@ -1003,7 +1047,7 @@
     </section>
 
     <div id="previewArea" class="split hidden">
-      <section class="card">
+      <section class="card product-summary-card">
         <div class="section-title">
           <h2>상품 요약</h2>
           <span id="productPreviewCount" class="small"></span>
